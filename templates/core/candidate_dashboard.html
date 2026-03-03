@@ -21,8 +21,9 @@
                         {% if app.job.company.company_profile.logo %}
                         <img src="{{ app.job.company.company_profile.logo.url }}" class="w-full h-full object-cover">
                         {% else %}
-                        {{ app.job.company.company_profile.company_name.0|upper|default:app.job.company.username.0|upper
-                        }}
+                        <span>{{
+                            app.job.company.company_profile.company_name.0|upper|default:app.job.company.username.0|upper
+                            }}</span>
                         {% endif %}
                     </div>
                     <div>

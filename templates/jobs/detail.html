@@ -28,8 +28,12 @@
                     </div>
                     <div>
                         <h1 class="text-3xl font-bold text-gray-900 mb-1">{{ job.title }}</h1>
-                        <p class="text-xl text-blue-600 font-medium">{% if job.company.company_profile %}{{
-                            job.company.company_profile.company_name }}{% else %}{{ job.company.username }}{% endif %}
+                        <p class="text-xl text-blue-600 font-medium">
+                            {% if job.company.company_profile %}
+                            <span>{{ job.company.company_profile.company_name }}</span>
+                            {% else %}
+                            <span>{{ job.company.username }}</span>
+                            {% endif %}
                         </p>
                     </div>
                 </div>

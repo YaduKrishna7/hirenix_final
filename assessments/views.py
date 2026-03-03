@@ -155,7 +155,7 @@ def submit_mcq_test(request, app_id):
     return redirect('dashboard')
 
 from .models import QuestionBank, CandidateMCQAttempt, VoiceInterview, VoiceQuestionResponse
-from .mcq_generator import TECH_FACTS
+from .mcq_generator import fetch_wiki_summary
 
 @login_required
 def take_voice_test(request, app_id):
@@ -171,8 +171,9 @@ def take_voice_test(request, app_id):
         messages.info(request, "You have already passed Level 2.")
         return redirect('dashboard')
         
-    # Generate 5 Questions if starting fresh
-    if created or not interview.responses.exists():
+    # Generate 5 Questions if starting fresh or if it crashed mid-generation
+    if interview.responses.count() < 5:
+        interview.responses.all().delete()
         # Question 1: Behavioral Intro
         VoiceQuestionResponse.objects.create(
             interview=interview,
@@ -201,25 +202,25 @@ def take_voice_test(request, app_id):
         random.shuffle(domains)
         tech_topics = []
         for d in domains:
-            if d.lower() in TECH_FACTS and d.lower() not in tech_topics:
+            if d.lower() not in tech_topics:
                 tech_topics.append(d.lower())
             if len(tech_topics) >= 4:
                 break
                 
         # Fill gaps with general tech if ATS extracted obscure stuff
-        fallback_topics = ['python', 'git', 'database design', 'agile']
+        fallback_topics = ['python', 'git', 'database_design', 'agile']
         while len(tech_topics) < 4:
             tech_topics.append(fallback_topics.pop())
             
         # Create Question 2-5
         for i, topic in enumerate(tech_topics, start=2):
             q_text = f"Technical Scenario: Can you describe your practical experience with {topic.upper()}? Explain a problem you successfully solved using its core features."
-            e_ans = TECH_FACTS.get(topic, "A core concept in software engineering.")
+            
             VoiceQuestionResponse.objects.create(
                 interview=interview,
                 question_number=i,
                 question_text=q_text,
-                expected_answer=e_ans,
+                expected_answer="", # No longer used for comparison scoring
                 is_technical=True
             )
             
@@ -278,21 +279,21 @@ def submit_voice_test(request, app_id):
         fluency_score, confidence_score, transcription = process_voice_interview(wav_path)
         technical_score = 0.0
         
-        # If it's a technical question, calculate TF-IDF similarity text score
-        if question.is_technical and question.expected_answer:
-            from sklearn.feature_extraction.text import TfidfVectorizer
-            from sklearn.metrics.pairwise import cosine_similarity
+        # If it's a technical question, calculate a score based strictly on what the candidate answered
+        if question.is_technical:
+            from jobs.ats import extract_skills_and_domains
+            import re
             
-            # Very basic text comparison
-            texts = [question.expected_answer.lower(), transcription.lower()]
-            try:
-                vectorizer = TfidfVectorizer(stop_words='english')
-                tfidf_matrix = vectorizer.fit_transform(texts)
-                sim = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
-                technical_score = sim * 100
-                technical_score = min(technical_score * 1.5, 100.0) # Bump up lenient score since spoken tech terms are often messy
-            except Exception as e:
-                print(f"TFIDF Error: {e}")
+            # Count how many meaningful technical terms they successfully used in their answer
+            skills_mentioned = extract_skills_and_domains(transcription.lower())
+            keyword_score = len(skills_mentioned) * 15.0 # 15 points per valid tech keyword
+            
+            # Factor in the depth/length of their answer (if they give a 1-word answer, it's bad)
+            word_count = len(re.findall(r'\w+', transcription))
+            length_score = min((word_count / 30.0) * 40.0, 40.0) # Up to 40 max points for explaining > 30 words
+            
+            technical_score = min(keyword_score + length_score, 100.0)
+            print(f"Candidate scored {technical_score} on Tech Q. Keywords: {skills_mentioned}, Length: {word_count}")
                 
         # Save Question Record
         question.audio_file = audio_file
@@ -330,22 +331,17 @@ def calculate_final_voice_score(request, app, interview):
     interview.overall_confidence = round(avg_confidence, 2)
     interview.overall_technical_score = round(avg_tech, 2)
     
-    # Passing Rule: General fluency/confidence > 40, Technical Accuracy > 30%
-    passed = avg_fluency >= 40.0 and avg_confidence >= 30.0 and avg_tech >= 30.0
+    # Always pass candidate to Level 3 HR Interview regardless of score
+    passed = True
     interview.passed = passed
     interview.save()
     
     app.voice_fluency_score = interview.overall_fluency
     app.voice_confidence_score = interview.overall_confidence
     
-    if passed:
-        app.status = Application.Status.LEVEL3_PENDING
-        app.save()
-        messages.success(request, f"Passed Level 2! Fluency: {avg_fluency}%, Tech Accuracy: {avg_tech}%")
-    else:
-        app.status = Application.Status.LEVEL2_FAILED
-        app.save()
-        messages.error(request, f"Failed Level 2. Fluency: {avg_fluency}%, Tech Accuracy: {avg_tech}%")
+    app.status = Application.Status.LEVEL3_PENDING
+    app.save()
+    messages.success(request, f"Voice Interview completed! You have advanced to Level 3. Fluency: {avg_fluency}%, Tech Accuracy: {avg_tech}%")
 
 @login_required
 def voice_detail(request, app_id):
