@@ -112,6 +112,15 @@
             </form>
         </div>
     </div>
+
+    <!-- Anti-Cheat Webcam Modal -->
+    <div id="webcam-container"
+        class="fixed bottom-4 right-4 w-48 h-36 bg-gray-900 rounded-lg border-2 border-red-500 overflow-hidden shadow-2xl z-50 flex items-center justify-center">
+        <video id="webcam-video" autoplay playsinline muted
+            class="w-full h-full object-cover transform -scale-x-100"></video>
+        <div id="camera-warning" class="absolute text-white text-xs font-bold text-center p-2 hidden">Camera Mandatory
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -260,6 +269,50 @@
             submitButton.disabled = false;
             submitButton.classList.remove('opacity-75', 'cursor-not-allowed');
         }
+    });
+
+    // --- ANTI-CHEAT LOGIC ---
+    let cheatWarnings = 0;
+    const MAX_WARNINGS = 3;
+
+    document.addEventListener("visibilitychange", function () {
+        if (document.hidden) {
+            cheatWarnings++;
+            if (cheatWarnings >= MAX_WARNINGS) {
+                alert("SECURITY VIOLATION! You have switched tabs too many times. Your assessment will now auto-submit and fail.");
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    stopRecordingAndSubmit();
+                } else {
+                    // Force a dummy fail submission or just let them stay blocked
+                    // We can simulate an empty blob submission to fail them
+                    const emptyBlob = new Blob([], { type: 'audio/webm' });
+                    window.recordedAudioBlob = emptyBlob;
+                    voiceForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+                }
+            } else {
+                alert(`SECURITY WARNING (${cheatWarnings}/${MAX_WARNINGS}): Please do not switch tabs or leave this window. Doing so again will lead to disqualification.`);
+            }
+        }
+    });
+
+    async function startWebcam() {
+        const video = document.getElementById('webcam-video');
+        const warning = document.getElementById('camera-warning');
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+        } catch (err) {
+            console.error("Camera access denied", err);
+            video.style.display = 'none';
+            warning.classList.remove('hidden');
+            alert("Camera access is MANDATORY for this assessment. Please allow camera permissions and refresh the page.");
+            document.getElementById('recordButton').disabled = true;
+            document.getElementById('recordButton').classList.add('opacity-50', 'cursor-not-allowed');
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        startWebcam();
     });
 </script>
 {% endblock %}

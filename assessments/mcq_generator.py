@@ -20,6 +20,9 @@ QUESTION_TEMPLATES = [
     "Which statement accurately represents the technology known as {domain}?",
 ]
 
+import functools
+
+@functools.lru_cache(maxsize=128)
 def fetch_wiki_summary(query):
     """Pulls tech facts directly from the internet via Wikipedia's public API."""
     search_query = urllib.parse.quote(query + " software")
@@ -57,15 +60,12 @@ def generate_mcq_for_domain(domain, used_questions=None):
         # Fallback to local DB if no internet connection or wiki fails
         return fallback_question(domain, used_questions)
         
-    # 2. Pick 3 WRONG facts from OTHER domains from the internet
+    # 2. Pick 3 WRONG facts from OTHER domains
     other_domains = [d for d in FALLBACK_DOMAINS if d.lower().split()[0] not in domain.lower()]
     wrong_facts = []
     for d in random.sample(other_domains, 3):
-        fact = fetch_wiki_summary(d)
-        if fact:
-            wrong_facts.append(fact)
-        else:
-            wrong_facts.append(f"It is a technology unrelated to {domain}.")
+        # Avoid hitting Wikipedia 30+ times per user which causes the page to infinitely load
+        wrong_facts.append(f"It is a technology or methodology unrelated to {domain}, functioning primarily as {d}.")
     
     # 3. Choose a random template
     q_template = random.choice(QUESTION_TEMPLATES)

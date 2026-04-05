@@ -147,3 +147,12 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Email Config (Real SMTP)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'hirenix6@gmail.com'
+EMAIL_HOST_PASSWORD = 'xshavvfokrqaugnd'
+DEFAULT_FROM_EMAIL = 'hirenix6@gmail.com'

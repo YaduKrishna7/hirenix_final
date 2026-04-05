@@ -331,17 +331,22 @@ def calculate_final_voice_score(request, app, interview):
     interview.overall_confidence = round(avg_confidence, 2)
     interview.overall_technical_score = round(avg_tech, 2)
     
-    # Always pass candidate to Level 3 HR Interview regardless of score
-    passed = True
+    # Pass candidate to Level 3 HR Interview only if they meet the threshold
+    passed = (avg_fluency >= 40.0 and avg_tech >= 40.0)
     interview.passed = passed
     interview.save()
     
     app.voice_fluency_score = interview.overall_fluency
     app.voice_confidence_score = interview.overall_confidence
     
-    app.status = Application.Status.LEVEL3_PENDING
+    if passed:
+        app.status = Application.Status.LEVEL3_PENDING
+        messages.success(request, f"Voice Interview Passed! You have advanced to Level 3. Fluency: {round(avg_fluency)}%, Tech Accuracy: {round(avg_tech)}%")
+    else:
+        app.status = Application.Status.LEVEL2_FAILED
+        messages.error(request, f"Voice Interview Failed. Fluency: {round(avg_fluency)}%, Tech Accuracy: {round(avg_tech)}%")
+        
     app.save()
-    messages.success(request, f"Voice Interview completed! You have advanced to Level 3. Fluency: {avg_fluency}%, Tech Accuracy: {avg_tech}%")
 
 @login_required
 def voice_detail(request, app_id):

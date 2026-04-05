@@ -3,6 +3,8 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_protect
 from jobs.models import Job, Application
 from django.contrib import messages
+from django.core.mail import send_mail
+from django.conf import settings
 
 def home_view(request):
     if request.user.is_authenticated:
@@ -52,7 +54,15 @@ def dashboard_view(request):
         
         return render(request, 'core/hr_dashboard.html', {'applications': applications})
     elif request.user.role == 'ADMIN' or request.user.is_superuser:
-        return redirect('admin:index')
+        from users.models import User
+        companies = User.objects.filter(role='COMPANY').select_related('company_profile').order_by('-date_joined')
+        candidates = User.objects.filter(role='CANDIDATE').select_related('candidate_profile').order_by('-date_joined')
+        hrs = User.objects.filter(role='HR').order_by('-date_joined')
+        return render(request, 'core/admin_dashboard.html', {
+            'companies': companies,
+            'candidates': candidates,
+            'hrs': hrs
+        })
     else:
         return render(request, 'core/admin_dashboard.html')
 
@@ -94,7 +104,25 @@ def hr_feedback_view(request, app_id):
             meet_link = request.POST.get('meet_link', '')
             app.hr_meet_link = meet_link
             app.save()
-            messages.success(request, "Meeting link sent to candidate.")
+            
+            # Send Email Notification
+            company_name = getattr(app.job.company, 'company_profile', None)
+            company_name = company_name.company_name if company_name else app.job.company.username
+            subject = f"Interview Scheduled: {app.job.title} at {company_name}"
+            message = f"Hello {app.candidate.username},\n\nYour HR interview has been scheduled for the {app.job.title} position. Please join the meeting using the following link:\n{meet_link}\n\nBest regards,\nHirenix Automation"
+            
+            try:
+                send_mail(
+                    subject,
+                    message,
+                    settings.EMAIL_HOST_USER,
+                    [app.candidate.email],
+                    fail_silently=True,
+                )
+            except Exception as e:
+                print(f"Failed to send email: {e}")
+                
+            messages.success(request, "Meeting link sent directly to candidate's email.")
             
         elif action == 'HIRE':
             app.status = Application.Status.HIRED
@@ -109,3 +137,24 @@ def hr_feedback_view(request, app_id):
             return redirect('dashboard')
             
     return render(request, 'core/hr_feedback.html', {'app': app})
+
+@login_required
+@csrf_protect
+def delete_user_view(request, user_id):
+    if request.user.role != 'ADMIN' and not request.user.is_superuser:
+        messages.error(request, "Permission denied.")
+        return redirect('dashboard')
+        
+    if request.method == 'POST':
+        from users.models import User
+        user_to_delete = get_object_or_404(User, pk=user_id)
+        
+        if user_to_delete == request.user:
+            messages.error(request, "You cannot delete your own admin account.")
+        else:
+            role = user_to_delete.get_role_display()
+            username = user_to_delete.username
+            user_to_delete.delete()
+            messages.success(request, f"{role} account '{username}' successfully deleted.")
+            
+    return redirect('dashboard')

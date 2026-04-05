@@ -11,7 +11,7 @@
         </div>
 
         <form method="GET" action="{% url 'jobs:list' %}" class="flex gap-2">
-            <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search by job title..."
+            <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search by title or company..."
                 class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 w-64">
             <button type="submit"
                 class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">Search</button>

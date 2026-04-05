@@ -5,12 +5,18 @@ from users.models import User
 from .models import Job, Application
 from .ats import extract_text_from_pdf, calculate_ats_score
 
+from django.db.models import Q
+
 def job_list(request):
     jobs = Job.objects.filter(status=Job.Status.OPEN).order_by('-created_at')
     
     query = request.GET.get('q')
     if query:
-        jobs = jobs.filter(title__icontains=query)
+        jobs = jobs.filter(
+            Q(title__icontains=query) |
+            Q(company__username__icontains=query) |
+            Q(company__company_profile__company_name__icontains=query)
+        ).distinct()
         
     return render(request, 'jobs/list.html', {'jobs': jobs, 'query': query})
 

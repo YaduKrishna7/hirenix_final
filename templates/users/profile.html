@@ -76,7 +76,11 @@
                     <p class="text-xs text-gray-500 mt-2">PDF format only. Max 5MB.</p>
                 </div>
 
-                <div class="pt-4 border-t border-gray-100 flex justify-end">
+                <div class="pt-4 border-t border-gray-100 flex justify-between items-center">
+                    <a href="{% url 'password_change' %}"
+                        class="bg-white text-gray-700 px-6 py-2.5 rounded-xl text-sm font-bold border border-gray-200 shadow-sm hover:bg-gray-50 transition-all">
+                        Change Password
+                    </a>
                     <button type="submit"
                         class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold shadow-md shadow-blue-200 hover:bg-blue-700 hover:-translate-y-0.5 transition-all">
                         Save Changes
